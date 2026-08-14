@@ -9,7 +9,7 @@ import { badRequest, handler, parse } from "../http.js";
 
 export const uploadsRouter = Router();
 
-export const UPLOAD_DIR = path.resolve(process.cwd(), "uploads");
+export const UPLOAD_DIR = path.resolve(process.cwd(), env.uploadDir);
 
 const MAX_BYTES = 6 * 1024 * 1024;
 const EXTENSIONS: Record<string, string> = {
@@ -22,10 +22,13 @@ const EXTENSIONS: Record<string, string> = {
 /**
  * Photo upload, base64 over JSON.
  *
- * Deliberately dumb: files land on local disk and are served straight back from
- * /uploads. It keeps the base dependency-free and works offline. Swapping in S3
- * or Cloudinary later means changing only this file — everything downstream just
- * stores a URL string.
+ * Deliberately dumb: files land on disk and are served straight back from
+ * /uploads. It keeps the base dependency-free and works offline.
+ *
+ * In production UPLOAD_DIR must point at a mounted volume, or every deploy wipes
+ * every listing photo. This also means the server can only run as a single
+ * instance — the day it needs to scale horizontally, move this to S3/R2. Nothing
+ * downstream cares: the rest of the app only ever stores a URL string.
  */
 uploadsRouter.post(
   "/",

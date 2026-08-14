@@ -42,12 +42,13 @@ listingsRouter.get(
       };
     }
 
-    // SQLite's LIKE is case-insensitive for ASCII, which is good enough here.
-    // Moving to Postgres means switching this to a tsvector search.
+    // `mode: insensitive` is not optional: Postgres LIKE is case-sensitive, so
+    // without it searching "Dresser" would miss a listing titled "dresser".
+    // Good enough until the catalogue is big enough to want a tsvector index.
     if (query.q) {
       where.OR = [
-        { title: { contains: query.q } },
-        { description: { contains: query.q } },
+        { title: { contains: query.q, mode: "insensitive" } },
+        { description: { contains: query.q, mode: "insensitive" } },
       ];
     }
 

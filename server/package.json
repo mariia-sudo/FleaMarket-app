@@ -7,13 +7,13 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "start": "node dist/index.js",
-    "db:push": "prisma db push",
+    "start": "prisma migrate deploy && node dist/index.js",
+    "migrate": "prisma migrate dev",
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
     "seed": "tsx prisma/seed.ts",
     "audit": "tsx scripts/audit.ts",
-    "reset": "rm -f prisma/dev.db && prisma db push && npm run seed"
+    "reset": "prisma migrate reset --force --skip-seed && npm run seed"
   },
   "dependencies": {
     "@prisma/client": "^6.2.1",

@@ -22,9 +22,19 @@ export const env = {
   stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? "",
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
 
-  // Where Stripe sends the user back after Checkout / Connect onboarding.
-  publicUrl: process.env.PUBLIC_URL ?? "http://localhost:4000",
+  // Where Stripe sends the user back after Checkout / Connect onboarding, and
+  // the host that uploaded photo URLs are built from. Must be the address the
+  // phone can actually reach — not localhost — the moment anything but a
+  // simulator talks to this server.
+  publicUrl:
+    process.env.NODE_ENV === "production"
+      ? required("PUBLIC_URL")
+      : (process.env.PUBLIC_URL ?? "http://localhost:4000"),
   appScheme: process.env.APP_SCHEME ?? "fleamarket",
+
+  // Listing photos live on disk. In a container the filesystem is wiped on every
+  // deploy, so in production this must point at a mounted persistent volume.
+  uploadDir: process.env.UPLOAD_DIR ?? "uploads",
 } as const;
 
 export const stripeEnabled = env.stripeSecretKey.length > 0;

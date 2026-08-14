@@ -17,10 +17,19 @@ Two pieces:
 
 Two terminals.
 
-**API** — creates a SQLite database, fills it with demo data, starts on port 4000:
+**Postgres** — the same engine in development as in production, on purpose. Developing
+on SQLite and deploying on Postgres hides real differences until they break in front of
+users; two of them (case-sensitive search, row locking) were live bugs in this codebase
+until the switch.
 
 ```bash
-cd server && npm install && npm run reset && npm run dev
+brew install postgresql@16 && brew services start postgresql@16 && createdb fleamarket
+```
+
+**API** — applies migrations, fills the database with demo data, starts on port 4000:
+
+```bash
+cd server && npm install && npm run migrate && npm run seed && npm run dev
 ```
 
 **App** — opens in the iOS simulator:
@@ -273,9 +282,9 @@ Deliberate omissions, roughly in the order they'll start hurting:
   spamming listings.
 - **Email verification and password reset.**
 - **Image moderation.** Anyone can upload anything.
-- **Postgres.** SQLite is fine for development and wrong for production. The schema is
-  written to port cleanly; the one thing to fix on the way is the read-then-write balance
-  check in `ledger.ts`, which needs `SELECT … FOR UPDATE` under real concurrency.
+- **Object storage for photos.** They're written to `UPLOAD_DIR` on local disk, which
+  means the API can only ever run as one instance, and that directory must be a mounted
+  volume in production. Moving to S3/R2 touches one file, `routes/uploads.ts`.
 - **Dark mode.** The app is light-only.
 - **Tests.** `server/scripts/audit.ts` proves the ledger balances, which is the invariant
   that matters most, but there are no unit tests.

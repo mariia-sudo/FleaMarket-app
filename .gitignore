@@ -20,3 +20,7 @@ mobile/ios/
 mobile/android/
 mobile/expo-env.d.ts
 *.log
+
+# App Store Connect API key — a credential, never commit it
+mobile/credentials/
+*.p8

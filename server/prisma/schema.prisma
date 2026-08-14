@@ -14,9 +14,10 @@ generator client {
 }
 
 datasource db {
-  // SQLite for local development. Swap to postgresql for production — the schema is
-  // written to be portable (no SQLite-only types are used).
-  provider = "sqlite"
+  // Postgres in development as well as production, deliberately. Developing on
+  // SQLite and deploying on Postgres hides real differences — case-sensitive
+  // LIKE, transaction behaviour, row locking — until they break in production.
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 

@@ -18,27 +18,39 @@ export type EntryInput = { accountId: string; delta: number };
 /**
  * Resolve the ledger account for a user, creating it on first use.
  * Every user has exactly one USER_AVAILABLE account.
+ *
+ * Upsert rather than find-then-create: two simultaneous first actions by the
+ * same user would otherwise race to create two accounts, and a user with two
+ * wallets is a user whose balance depends on which one you look at.
  */
 export async function userAccount(tx: Tx, userId: string): Promise<string> {
   const kind: AccountKind = "USER_AVAILABLE";
-  const existing = await tx.account.findFirst({ where: { kind, userId } });
-  if (existing) return existing.id;
-  const created = await tx.account.create({ data: { kind, userId } });
-  return created.id;
+  const account = await tx.account.upsert({
+    where: { kind_userId: { kind, userId } },
+    create: { kind, userId },
+    update: {},
+  });
+  return account.id;
 }
 
 /**
  * Resolve a platform-owned account. These are singletons and are allowed to hold
  * a negative balance: SYSTEM_MINT sitting at -50000 means 500 coins exist.
+ *
+ * Their primary key is the kind itself. The @@unique([kind, userId]) constraint
+ * can't protect them — SQL treats NULLs as distinct, so it would happily allow
+ * two SYSTEM_ESCROW rows — but a fixed id makes duplicates impossible.
  */
 export async function systemAccount(tx: Tx, kind: AccountKind): Promise<string> {
   if (!kind.startsWith("SYSTEM_")) {
     throw new Error(`systemAccount called with user account kind ${kind}`);
   }
-  const existing = await tx.account.findFirst({ where: { kind, userId: null } });
-  if (existing) return existing.id;
-  const created = await tx.account.create({ data: { kind, userId: null } });
-  return created.id;
+  const account = await tx.account.upsert({
+    where: { id: kind },
+    create: { id: kind, kind, userId: null },
+    update: {},
+  });
+  return account.id;
 }
 
 export async function balanceOf(tx: Tx, accountId: string): Promise<number> {
@@ -65,9 +77,7 @@ export async function userBalance(tx: Tx, userId: string): Promise<number> {
  * *user* account negative — a bug in a route should surface as a failed request,
  * never as invented coins.
  *
- * Must be called inside `prisma.$transaction`. SQLite serialises writers, so the
- * read-then-write balance check below is safe here; on Postgres, add a
- * `SELECT ... FOR UPDATE` on the touched accounts before shipping.
+ * Must be called inside `prisma.$transaction`.
  */
 export async function postTx(
   tx: Tx,
@@ -91,6 +101,22 @@ export async function postTx(
     throw new Error(`Ledger tx ${kind} does not balance: net ${net}`);
   }
 
+  const debited = [...new Set(entries.filter((e) => e.delta < 0).map((e) => e.accountId))];
+
+  // Lock every account we're taking coins out of, BEFORE writing anything.
+  //
+  // Without this, two purchases racing on the same wallet each read a healthy
+  // balance, each decide there's enough, and both commit — the buyer spends the
+  // same coins twice. Postgres only shows a transaction its own uncommitted
+  // rows, so summing entries is not enough on its own.
+  //
+  // Sorted by id so that two transactions touching the same pair of accounts
+  // always grab the locks in the same order, which is what stops them
+  // deadlocking against each other.
+  for (const accountId of [...debited].sort()) {
+    await tx.$queryRaw`SELECT id FROM "Account" WHERE id = ${accountId} FOR UPDATE`;
+  }
+
   const ledgerTx = await tx.ledgerTx.create({
     data: { kind, reference, memo },
   });
@@ -103,7 +129,6 @@ export async function postTx(
 
   // Verify after the fact rather than before: this way the check accounts for
   // everything else committed in the same transaction.
-  const debited = [...new Set(entries.filter((e) => e.delta < 0).map((e) => e.accountId))];
   for (const accountId of debited) {
     const account = await tx.account.findUniqueOrThrow({ where: { id: accountId } });
     if (account.kind !== "USER_AVAILABLE") continue;
