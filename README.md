@@ -258,6 +258,11 @@ GET    /meta                   public — categories and conditions
 
 Deliberate omissions, roughly in the order they'll start hurting:
 
+- **Account deletion.** Apple requires any app that lets you create an account to let you
+  delete it from inside the app (guideline 5.1.1(v)). There is no such endpoint or
+  screen, so this is a guaranteed App Store rejection. Note it isn't a plain `DELETE FROM
+  users`: ledger entries and completed orders are financial records the other party is
+  entitled to, so deletion has to anonymise the user rather than remove the rows.
 - **Reviews and ratings.** A used-goods marketplace runs on trust and there is currently
   none. This is the first thing to build.
 - **Push notifications.** Chat polls every 4 seconds while the screen is open, and
