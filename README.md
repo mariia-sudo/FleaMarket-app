@@ -42,9 +42,12 @@ Sign in with any demo account. Password for all of them is `password123`:
 
 | Email | Coins | What they have |
 |---|---|---|
-| `maya@example.com` | 240 | Furniture, moving out |
-| `dev@example.com` | 80 | Audio gear |
-| `sam@example.com` | 45 | Clothing, small stuff |
+| `maya@example.com` | 263 | Furniture, moving out |
+| `dev@example.com` | 40 | Audio gear |
+| `sam@example.com` | 62 | Clothing, small stuff |
+
+They also have three completed trades between them, so the profiles have reviews on
+them out of the box.
 
 The sign-in screen has a "fill the demo account" shortcut. **Delete that block before
 anyone real sees the app** — it's in `mobile/app/(auth)/sign-in.tsx`.
@@ -141,21 +144,6 @@ Cash out    user        −100   →  SYSTEM_PAYOUT +100  coins burned, dollars 
 
 System accounts may go negative. `SYSTEM_MINT` sitting at −41800 means 418 coins exist.
 
-## Reviews you can believe
-
-A review can only be created from a **COMPLETED order**, by one of its two participants,
-about the other one, once. There is no other endpoint that makes one. That's the whole
-anti-fake-review design, and it's structural rather than a policy: to leave a review you
-must have actually traded, which means buying coins and paying the cash-out spread on the
-way back out. Astroturfing a reputation costs real money.
-
-Both sides review each other, and the profile says which hat someone was wearing —
-"showed up on time and paid" is a different signal from "item was as described".
-
-Profiles show city and state and nothing finer. A local marketplace profile needs to
-answer "roughly where do I collect this", not "where does this person live"; the exact
-spot is agreed in chat.
-
 **Escrow is the product.** When a buyer taps Buy, the coins leave their wallet but do
 *not* reach the seller — they sit in `SYSTEM_ESCROW` until the buyer confirms they
 physically have the item. Either side can cancel until then. This is the honest answer
@@ -185,6 +173,23 @@ cd server && npm run audit
 
 Prints every account and fails loudly if the ledger doesn't sum to zero. Run it after
 touching `ledger.ts`, and on a schedule in production.
+
+---
+
+## Reviews you can believe
+
+A review can only be created from a **COMPLETED order**, by one of its two participants,
+about the other one, once. There is no other endpoint that makes one. That's the whole
+anti-fake-review design, and it's structural rather than a policy: to leave a review you
+must have actually traded, which means buying coins and paying the cash-out spread on the
+way back out. Astroturfing a reputation costs real money.
+
+Both sides review each other, and the profile says which hat someone was wearing —
+"showed up on time and paid" is a different signal from "item was as described".
+
+Profiles show city and state and nothing finer. A local marketplace profile needs to
+answer "roughly where do I collect this", not "where does this person live"; the exact
+spot is agreed in chat.
 
 ---
 
