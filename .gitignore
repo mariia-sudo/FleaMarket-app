@@ -24,3 +24,6 @@ mobile/expo-env.d.ts
 # App Store Connect API key — a credential, never commit it
 mobile/credentials/
 *.p8
+
+# Презентация — держим локально, не в репозитории
+*.pptx
