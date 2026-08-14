@@ -156,6 +156,30 @@ export type LedgerEntry = {
   createdAt: string;
 };
 
+export type Review = {
+  id: string;
+  rating: number;
+  body: string | null;
+  createdAt: string;
+  author: PublicUser;
+  /** Which side this person was on in that trade. */
+  role: "seller" | "buyer";
+  listingTitle: string;
+};
+
+export type Profile = {
+  user: PublicUser;
+  stats: {
+    activeListings: number;
+    completedSales: number;
+    completedPurchases: number;
+    ratingAverage: number | null;
+    ratingCount: number;
+  };
+  listings: Listing[];
+  reviews: Review[];
+};
+
 export type ThreadSummary = {
   id: string;
   lastMessageAt: string;
@@ -240,6 +264,17 @@ export const api = {
 
   cancelOrder: (id: string) =>
     request<{ order: Order }>(`/orders/${id}/cancel`, { method: "POST" }),
+
+  profile: (userId: string) => request<Profile>(`/users/${userId}`),
+
+  reviewStatus: (orderId: string) =>
+    request<{ reviewed: boolean; rating: number | null }>(`/orders/${orderId}/review`),
+
+  leaveReview: (orderId: string, rating: number, body?: string) =>
+    request<{ review: Review }>(`/orders/${orderId}/review`, {
+      method: "POST",
+      body: { rating, body },
+    }),
 
   wallet: () => request<Wallet>("/wallet"),
 

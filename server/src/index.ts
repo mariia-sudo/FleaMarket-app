@@ -8,6 +8,7 @@ import { listingsRouter } from "./routes/listings.js";
 import { ordersRouter } from "./routes/orders.js";
 import { stripeWebhookRouter } from "./routes/stripeWebhook.js";
 import { UPLOAD_DIR, uploadsRouter } from "./routes/uploads.js";
+import { usersRouter } from "./routes/users.js";
 import { walletRouter } from "./routes/wallet.js";
 import { stripeEnabled } from "./stripe.js";
 import { CATEGORIES, CONDITIONS } from "./types.js";
@@ -39,6 +40,7 @@ app.use("/listings", listingsRouter);
 app.use("/orders", ordersRouter);
 app.use("/wallet", walletRouter);
 app.use("/chat", chatRouter);
+app.use("/users", usersRouter);
 app.use("/uploads", uploadsRouter);
 
 app.use((_req, _res, next) => next(notFound("No such endpoint")));

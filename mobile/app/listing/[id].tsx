@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ApiError, api } from "../../src/api";
 import { useAuth } from "../../src/auth";
+import { Stars } from "../../src/components/Stars";
 import { Avatar, Badge, Button, Coins, Divider, Empty, Loader, Txt } from "../../src/components/ui";
 import { formatCoins, formatDate } from "../../src/money";
 import { colors, radius, shadow, space } from "../../src/theme";
@@ -36,6 +37,15 @@ export default function ListingDetail() {
 
   const { data, loading, error, reload } = useQuery(() => api.listing(id), [id]);
   const listing = data?.listing;
+
+  // Second request rather than folding the rating into the listing payload: the
+  // feed would then need an aggregate per row, and that's a query per listing.
+  const sellerId = listing?.seller.id;
+  const { data: seller } = useQuery(
+    () => (sellerId ? api.profile(sellerId) : Promise.resolve(null)),
+    [sellerId],
+  );
+  const sellerStats = seller?.stats ?? null;
 
   if (loading && !listing) return <Loader />;
   if (error || !listing) {
@@ -158,14 +168,26 @@ export default function ListingDetail() {
 
           <Divider />
 
-          <Pressable style={styles.seller}>
+          {/* Tapping through to the seller's profile is the main trust move on
+              this screen, so it gets the rating inline and a visible chevron. */}
+          <Pressable style={styles.seller} onPress={() => router.push(`/seller/${listing.seller.id}`)}>
             <Avatar user={listing.seller} size={44} />
-            <View style={{ flex: 1, gap: 2 }}>
+            <View style={{ flex: 1, gap: 3 }}>
               <Txt variant="bodyStrong">{listing.seller.displayName}</Txt>
-              <Txt variant="caption" color={colors.inkMuted} numberOfLines={1}>
-                {listing.seller.bio ?? `Joined ${formatDate(listing.seller.createdAt)}`}
-              </Txt>
+              {sellerStats && sellerStats.ratingCount > 0 ? (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm }}>
+                  <Stars rating={sellerStats.ratingAverage ?? 0} size={13} />
+                  <Txt variant="caption" color={colors.inkMuted}>
+                    {sellerStats.ratingAverage} · {sellerStats.completedSales} sold
+                  </Txt>
+                </View>
+              ) : (
+                <Txt variant="caption" color={colors.inkMuted} numberOfLines={1}>
+                  {sellerStats ? "No reviews yet" : `Joined ${formatDate(listing.seller.createdAt)}`}
+                </Txt>
+              )}
             </View>
+            <Ionicons name="chevron-forward" size={17} color={colors.inkMuted} />
           </Pressable>
 
           <View style={styles.escrowNote}>

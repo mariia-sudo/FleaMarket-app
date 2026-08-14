@@ -27,6 +27,7 @@ export default function RootLayout() {
           <Stack.Screen name="listing/[id]" options={{ title: "", headerTransparent: true }} />
           <Stack.Screen name="chat/[id]" options={{ title: "Chat" }} />
           <Stack.Screen name="order/[id]" options={{ title: "Order" }} />
+          <Stack.Screen name="seller/[id]" options={{ title: "Profile" }} />
         </Stack>
       </AuthProvider>
     </SafeAreaProvider>

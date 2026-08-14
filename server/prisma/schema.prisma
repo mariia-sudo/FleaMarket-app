@@ -53,9 +53,44 @@ model User {
   sales          Order[]    @relation("SellerOrders")
   topUps         TopUp[]
   payouts        Payout[]
-  favorites      Favorite[]
-  sentMessages   Message[]
-  threadsAsBuyer Thread[]   @relation("ThreadBuyer")
+  favorites        Favorite[]
+  sentMessages     Message[]
+  threadsAsBuyer   Thread[]   @relation("ThreadBuyer")
+  reviewsWritten   Review[]   @relation("ReviewAuthor")
+  reviewsReceived  Review[]   @relation("ReviewSubject")
+}
+
+// ---------------------------------------------------------------------------
+// Reviews
+// ---------------------------------------------------------------------------
+
+/**
+ * A review is only ever created from a COMPLETED order, by one of its two
+ * participants, about the other one. That is the whole anti-fake-review design:
+ * you cannot review someone you never traded with, because there is no row to
+ * hang the review on. It also means a seller can't buy themselves a reputation
+ * without also buying coins and paying the cash-out spread on the way out.
+ *
+ * Both sides may review each other, hence the unique on (order, author) rather
+ * than on order alone.
+ */
+model Review {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  authorId  String
+  author    User   @relation("ReviewAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  subjectId String
+  subject   User   @relation("ReviewSubject", fields: [subjectId], references: [id], onDelete: Cascade)
+
+  rating Int // 1..5, validated in the route
+  body   String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([orderId, authorId])
+  @@index([subjectId, createdAt])
 }
 
 // ---------------------------------------------------------------------------
@@ -200,6 +235,8 @@ model Order {
 
   createdAt   DateTime  @default(now())
   completedAt DateTime?
+
+  reviews Review[]
 
   @@index([buyerId, createdAt])
   @@index([sellerId, createdAt])

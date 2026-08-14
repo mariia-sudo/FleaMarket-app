@@ -60,6 +60,7 @@ const items = [
 async function main() {
   console.log("Clearing existing data…");
   // Order matters: children before parents.
+  await prisma.review.deleteMany();
   await prisma.message.deleteMany();
   await prisma.thread.deleteMany();
   await prisma.ledgerEntry.deleteMany();
@@ -135,7 +136,103 @@ async function main() {
     });
   }
 
-  console.log(`\nDone. ${users.length} users, ${items.length} listings.`);
+  console.log("Completing a few past trades…");
+  // Reviews can only exist on a completed order, so demo reviews need demo
+  // trades underneath them. These go through the same ledger movements a real
+  // purchase does — buyer to escrow, escrow to seller — so the books still
+  // balance afterwards.
+  const sales: {
+    buyer: string;
+    listing: string;
+    fromBuyer: { rating: number; body: string };
+    fromSeller: { rating: number; body: string };
+  }[] = [
+    {
+      buyer: "maya@example.com",
+      listing: "Cast iron skillet, 12 inch",
+      fromBuyer: { rating: 5, body: "Exactly as described, already slick. Sam met me at the subway which made it easy." },
+      fromSeller: { rating: 5, body: "Turned up on time and paid straight away. Ideal." },
+    },
+    {
+      buyer: "dev@example.com",
+      listing: "Vintage Levi's 501, 32x30",
+      fromBuyer: { rating: 4, body: "Fades are lovely. Slightly shorter in the leg than the tag says, but I was warned about measuring." },
+      fromSeller: { rating: 5, body: "Easy trade, asked good questions first." },
+    },
+    {
+      buyer: "sam@example.com",
+      listing: "IKEA Poäng chair + footstool",
+      fromBuyer: { rating: 5, body: "Maya carried it down four flights with me. Cushion was freshly washed as promised." },
+      fromSeller: { rating: 4, body: "Ran twenty minutes late but messaged ahead, no problem." },
+    },
+  ];
+
+  for (const sale of sales) {
+    const listing = await prisma.listing.findFirstOrThrow({ where: { title: sale.listing } });
+    const buyer = await prisma.user.findUniqueOrThrow({ where: { email: sale.buyer } });
+
+    await prisma.$transaction(async (tx) => {
+      const order = await tx.order.create({
+        data: {
+          listingId: listing.id,
+          buyerId: buyer.id,
+          sellerId: listing.sellerId,
+          amountCoins: listing.priceCoins,
+          feeCoins: 0,
+          status: "COMPLETED",
+          completedAt: new Date(),
+        },
+      });
+
+      const buyerAccount = await userAccount(tx, buyer.id);
+      const sellerAccount = await userAccount(tx, listing.sellerId);
+      const escrow = await systemAccount(tx, "SYSTEM_ESCROW");
+
+      await postTx(tx, {
+        kind: "PURCHASE",
+        reference: `order:${order.id}`,
+        memo: listing.title,
+        entries: [
+          { accountId: buyerAccount, delta: -listing.priceCoins },
+          { accountId: escrow, delta: listing.priceCoins },
+        ],
+      });
+      await postTx(tx, {
+        kind: "RELEASE",
+        reference: `order:${order.id}`,
+        memo: "Sale completed",
+        entries: [
+          { accountId: escrow, delta: -listing.priceCoins },
+          { accountId: sellerAccount, delta: listing.priceCoins },
+        ],
+      });
+
+      await tx.listing.update({ where: { id: listing.id }, data: { status: "SOLD" } });
+
+      await tx.review.createMany({
+        data: [
+          {
+            orderId: order.id,
+            authorId: buyer.id,
+            subjectId: listing.sellerId,
+            rating: sale.fromBuyer.rating,
+            body: sale.fromBuyer.body,
+          },
+          {
+            orderId: order.id,
+            authorId: listing.sellerId,
+            subjectId: buyer.id,
+            rating: sale.fromSeller.rating,
+            body: sale.fromSeller.body,
+          },
+        ],
+      });
+    });
+
+    console.log(`  ${sale.listing} → ${buyer.displayName}`);
+  }
+
+  console.log(`\nDone. ${users.length} users, ${items.length} listings, ${sales.length} past trades.`);
   console.log(`Sign in with any of the emails above, password: ${PASSWORD}`);
 }
 

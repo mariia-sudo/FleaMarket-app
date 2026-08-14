@@ -71,6 +71,13 @@ export default function You() {
           <Button label="Wallet" variant="secondary" onPress={() => router.push("/(tabs)/wallet")} />
         </View>
         <Divider />
+        <Pressable style={styles.link} onPress={() => router.push(`/seller/${user.id}`)}>
+          <Ionicons name="star-outline" size={19} color={colors.inkSoft} />
+          <Txt variant="body" style={{ flex: 1 } as object}>
+            Your public profile & reviews
+          </Txt>
+          <Ionicons name="chevron-forward" size={17} color={colors.inkMuted} />
+        </Pressable>
         <Pressable style={styles.link} onPress={() => router.push("/(tabs)/inbox")}>
           <Ionicons name="receipt-outline" size={19} color={colors.inkSoft} />
           <Txt variant="body" style={{ flex: 1 } as object}>

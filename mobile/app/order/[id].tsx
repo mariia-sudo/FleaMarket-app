@@ -2,9 +2,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
-import { Alert, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { ApiError, api } from "../../src/api";
 import { useAuth } from "../../src/auth";
+import { Stars } from "../../src/components/Stars";
 import { Avatar, Badge, Button, Card, Coins, Divider, Empty, Loader, Txt } from "../../src/components/ui";
 import { formatCoins, formatDate } from "../../src/money";
 import { colors, radius, space } from "../../src/theme";
@@ -19,7 +20,12 @@ export default function OrderDetail() {
   const { user, refresh } = useAuth();
   const [busy, setBusy] = useState(false);
 
+  const [rating, setRating] = useState(0);
+  const [reviewBody, setReviewBody] = useState("");
+  const [posting, setPosting] = useState(false);
+
   const { data, loading, error, reload } = useQuery(() => api.order(id), [id]);
+  const review = useQuery(() => api.reviewStatus(id), [id]);
   const order = data?.order;
 
   if (loading && !order) return <Loader />;
@@ -183,11 +189,63 @@ export default function OrderDetail() {
             full
           />
         </View>
+      ) : order.status === "COMPLETED" ? (
+        review.data?.reviewed ? (
+          <Card style={{ gap: space.sm, alignItems: "flex-start" }}>
+            <Txt variant="bodyStrong">You reviewed this trade</Txt>
+            <Stars rating={review.data.rating ?? 0} size={17} />
+            <Txt variant="caption" color={colors.inkMuted}>
+              It's on {other.displayName}'s profile now.
+            </Txt>
+          </Card>
+        ) : (
+          <Card style={{ gap: space.lg }}>
+            <View style={{ gap: space.xs }}>
+              <Txt variant="heading">How did it go with {other.displayName}?</Txt>
+              <Txt variant="caption" color={colors.inkMuted}>
+                This shows on their public profile. Only people who actually traded can
+                leave one, which is what makes them worth reading.
+              </Txt>
+            </View>
+
+            <Stars rating={rating} size={30} onChange={setRating} />
+
+            <TextInput
+              value={reviewBody}
+              onChangeText={setReviewBody}
+              placeholder={
+                selling
+                  ? "Did they show up, pay, communicate?"
+                  : "Was the item as described? Was the handoff easy?"
+              }
+              placeholderTextColor={colors.inkMuted}
+              multiline
+              maxLength={600}
+              style={styles.reviewInput}
+            />
+
+            <Button
+              label={rating === 0 ? "Pick a rating" : "Post review"}
+              disabled={rating === 0}
+              loading={posting}
+              full
+              onPress={async () => {
+                setPosting(true);
+                try {
+                  await api.leaveReview(order.id, rating, reviewBody.trim() || undefined);
+                  setReviewBody("");
+                  await review.reload();
+                } catch (e) {
+                  Alert.alert("Couldn't post it", e instanceof ApiError ? e.message : "Try again");
+                } finally {
+                  setPosting(false);
+                }
+              }}
+            />
+          </Card>
+        )
       ) : (
-        <Badge
-          label={order.status === "COMPLETED" ? "Completed" : "Cancelled"}
-          tone={order.status === "COMPLETED" ? "positive" : "warn"}
-        />
+        <Badge label="Cancelled" tone="warn" />
       )}
 
       <View style={{ height: space.xxl }} />
@@ -198,6 +256,17 @@ export default function OrderDetail() {
 const styles = StyleSheet.create({
   scroll: { padding: space.lg, gap: space.lg },
   cover: { width: 72, height: 72, borderRadius: radius.md },
+  reviewInput: {
+    minHeight: 88,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.bg,
+    padding: space.md,
+    fontSize: 15,
+    color: colors.ink,
+    textAlignVertical: "top",
+  },
   stepDot: {
     width: 20,
     height: 20,

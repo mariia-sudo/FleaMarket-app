@@ -141,6 +141,21 @@ Cash out    user        −100   →  SYSTEM_PAYOUT +100  coins burned, dollars 
 
 System accounts may go negative. `SYSTEM_MINT` sitting at −41800 means 418 coins exist.
 
+## Reviews you can believe
+
+A review can only be created from a **COMPLETED order**, by one of its two participants,
+about the other one, once. There is no other endpoint that makes one. That's the whole
+anti-fake-review design, and it's structural rather than a policy: to leave a review you
+must have actually traded, which means buying coins and paying the cash-out spread on the
+way back out. Astroturfing a reputation costs real money.
+
+Both sides review each other, and the profile says which hat someone was wearing —
+"showed up on time and paid" is a different signal from "item was as described".
+
+Profiles show city and state and nothing finer. A local marketplace profile needs to
+answer "roughly where do I collect this", not "where does this person live"; the exact
+spot is agreed in chat.
+
 **Escrow is the product.** When a buyer taps Buy, the coins leave their wallet but do
 *not* reach the seller — they sit in `SYSTEM_ESCROW` until the buyer confirms they
 physically have the item. Either side can cancel until then. This is the honest answer
@@ -251,6 +266,10 @@ POST   /wallet/topup           → Stripe Checkout URL, or instant in sandbox
 POST   /wallet/connect         start Stripe Connect onboarding
 POST   /wallet/payout          burn coins, transfer dollars
 
+GET    /users/:id              public seller profile: stats, listings, reviews
+POST   /orders/:id/review      rate the other side of a completed trade
+GET    /orders/:id/review      whether you still owe a review
+
 POST   /chat/threads           open/resume a conversation about a listing
 GET    /chat/threads
 GET    /chat/threads/:id/messages
@@ -272,8 +291,9 @@ Deliberate omissions, roughly in the order they'll start hurting:
   screen, so this is a guaranteed App Store rejection. Note it isn't a plain `DELETE FROM
   users`: ledger entries and completed orders are financial records the other party is
   entitled to, so deletion has to anonymise the user rather than remove the rows.
-- **Reviews and ratings.** A used-goods marketplace runs on trust and there is currently
-  none. This is the first thing to build.
+- **Reviewing a no-show.** Reviews hang off completed orders, so a seller who wastes
+  your afternoon and never turns up leaves no trace — the order just gets cancelled.
+  Cancellations probably need to be reviewable too, with the reason attached.
 - **Push notifications.** Chat polls every 4 seconds while the screen is open, and
   nothing reaches you when the app is closed.
 - **Disputes.** If a buyer never confirms, the coins sit in escrow forever. Needs an

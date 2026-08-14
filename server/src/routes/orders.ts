@@ -177,6 +177,78 @@ ordersRouter.post(
   }),
 );
 
+/**
+ * Leave a review on a finished trade.
+ *
+ * The guards here are the entire anti-fake-review design, so they're worth
+ * spelling out: the order must be COMPLETED (coins actually changed hands), the
+ * author must have been one of the two participants, the subject is always the
+ * other one, and the unique index on (orderId, authorId) means one review per
+ * person per trade. There is no endpoint that creates a review any other way.
+ */
+ordersRouter.post(
+  "/:id/review",
+  requireAuth,
+  handler(async (req, res) => {
+    const userId = currentUserId(req);
+    const body = parse(
+      z.object({
+        rating: z.number().int().min(1).max(5),
+        body: z.string().trim().max(600).optional(),
+      }),
+      req.body,
+    );
+
+    const order = await prisma.order.findUnique({ where: { id: param(req, "id") } });
+    if (!order) throw notFound("Order not found");
+    if (order.buyerId !== userId && order.sellerId !== userId) {
+      throw forbidden("That isn't your order");
+    }
+    if (order.status !== "COMPLETED") {
+      throw badRequest("You can only review a trade that went through");
+    }
+
+    const subjectId = order.buyerId === userId ? order.sellerId : order.buyerId;
+
+    const existing = await prisma.review.findUnique({
+      where: { orderId_authorId: { orderId: order.id, authorId: userId } },
+    });
+    if (existing) throw conflict("You've already reviewed this trade", "already_reviewed");
+
+    const review = await prisma.review.create({
+      data: {
+        orderId: order.id,
+        authorId: userId,
+        subjectId,
+        rating: body.rating,
+        body: body.body || null,
+      },
+    });
+
+    res.status(201).json({
+      review: {
+        id: review.id,
+        rating: review.rating,
+        body: review.body,
+        createdAt: review.createdAt,
+      },
+    });
+  }),
+);
+
+/** Whether this user still owes a review on this order — drives the prompt in the app. */
+ordersRouter.get(
+  "/:id/review",
+  requireAuth,
+  handler(async (req, res) => {
+    const userId = currentUserId(req);
+    const review = await prisma.review.findUnique({
+      where: { orderId_authorId: { orderId: param(req, "id"), authorId: userId } },
+    });
+    res.json({ reviewed: Boolean(review), rating: review?.rating ?? null });
+  }),
+);
+
 ordersRouter.get(
   "/",
   requireAuth,
