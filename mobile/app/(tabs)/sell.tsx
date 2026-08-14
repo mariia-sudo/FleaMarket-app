@@ -140,7 +140,7 @@ export default function Sell() {
         <View style={{ gap: space.xs }}>
           <Txt variant="title">Sell something</Txt>
           <Txt variant="body" color={colors.inkSoft}>
-            You keep every coin — there's no selling fee.
+            No fee on the sale. You only pay if you cash coins out to dollars.
           </Txt>
         </View>
 

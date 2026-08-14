@@ -4,22 +4,39 @@
  *
  * The economics below are the product's revenue model, and they are all levers:
  *
- *   Buying coins:  $1.00 buys 1 coin, and larger packs come with bonus coins.
+ *   Buying coins:  $1.00 buys 1 coin.
  *   Selling goods: the seller keeps 100% of the coins (PLATFORM_FEE_BPS = 0).
- *                  "0% seller fees" is the reason to use coins at all.
- *   Cashing out:   1 coin pays out $0.85.
+ *   Cashing out:   1 coin pays out $0.92, so a seller who converts to dollars
+ *                  gives up 8% — and one who spends the coins here gives up
+ *                  nothing at all.
  *
- * So the platform earns on the spread, not on the sale. A user who puts in $100
- * gets 108 coins; if every one of those coins is eventually cashed out we pay
- * $91.80 and keep $8.20 gross (~8%), out of which Stripe takes roughly half.
- * Coins that keep circulating inside the market never cost us the spread at all,
- * which is why "spend your earnings here" is worth pushing in the UI.
+ * Do not call this "0% seller fees". A seller who cashes out pays 8%, and
+ * anyone who does the arithmetic will notice. The honest claim is "you pay only
+ * when you take money out", which is also the claim that makes the incentive to
+ * keep coins circulating obvious.
+ *
+ * Why 8%: our competitors on *local pickup* — Facebook Marketplace, OfferUp,
+ * Craigslist — charge nothing, because they don't touch the payment at all.
+ * What they also don't do is hold the money until the buyer has the item. The
+ * shipping marketplaces do take a cut: Poshmark 20%, eBay ~13.6%, OfferUp 12.9%,
+ * Mercari 10%, Depop 0% + 3.3% processing (checked August 2026). 8% has to sit
+ * below the ones that charge and be worth it against the ones that don't.
+ *
+ * Margin check on $100 topped up and later fully cashed out:
+ *   in   $100.00  − Stripe (2.9% + $0.30) = $96.80
+ *   out  $92.00  + payout cost ~$0.25     = $92.25
+ *   kept  ~$4.55, about 4.5%.
+ *
+ * That margin is thin enough that bonus coins had to go: every bonus coin is
+ * paid for out of it. Reintroducing a 5% bonus would cost roughly the whole
+ * thing. Coins that never get cashed out cost us nothing, which is the part of
+ * the model worth designing the product around.
  */
 
 export const COIN = 100;
 
 export const TOPUP_RATE_USD_CENTS_PER_COIN = 100;
-export const PAYOUT_RATE_USD_CENTS_PER_COIN = 85;
+export const PAYOUT_RATE_USD_CENTS_PER_COIN = 92;
 
 /** Platform cut on a sale, in basis points. 0 = sellers keep everything. */
 export const PLATFORM_FEE_BPS = 0;
@@ -34,11 +51,14 @@ export type TopUpPack = {
   bonusCoins: number;
 };
 
+// Straight $1 = 1 coin, no bonuses — see the margin note above. `bonusCoins` is
+// kept in the shape because the ledger and the wallet screen already handle it,
+// so a promotion is a number change rather than a schema change.
 export const TOPUP_PACKS: TopUpPack[] = [
   { id: "pack_10", usdCents: 1_000, coins: 10 * COIN, bonusCoins: 0 },
-  { id: "pack_25", usdCents: 2_500, coins: 25 * COIN, bonusCoins: 1 * COIN },
-  { id: "pack_50", usdCents: 5_000, coins: 50 * COIN, bonusCoins: 3 * COIN },
-  { id: "pack_100", usdCents: 10_000, coins: 100 * COIN, bonusCoins: 8 * COIN },
+  { id: "pack_25", usdCents: 2_500, coins: 25 * COIN, bonusCoins: 0 },
+  { id: "pack_50", usdCents: 5_000, coins: 50 * COIN, bonusCoins: 0 },
+  { id: "pack_100", usdCents: 10_000, coins: 100 * COIN, bonusCoins: 0 },
 ];
 
 export function findPack(id: string): TopUpPack | undefined {

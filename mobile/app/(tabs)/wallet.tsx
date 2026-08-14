@@ -3,7 +3,7 @@ import * as WebBrowser from "expo-web-browser";
 import { useState } from "react";
 import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ApiError, api, type LedgerEntry } from "../../src/api";
+import { ApiError, api, type LedgerEntry, type Wallet } from "../../src/api";
 import { useAuth } from "../../src/auth";
 import { Badge, Button, Card, Coins, Divider, Empty, Loader, Txt } from "../../src/components/ui";
 import { formatCoins, formatDate, formatUsd } from "../../src/money";
@@ -18,6 +18,16 @@ const ENTRY_META: Record<LedgerEntry["kind"], { icon: keyof typeof Ionicons.glyp
   REFUND: { icon: "arrow-undo-outline", label: "Refund" },
   PAYOUT: { icon: "cash-outline", label: "Cash out" },
 };
+
+/**
+ * What cashing out actually costs the seller, derived from the two rates rather
+ * than written into the copy — the numbers live in server/src/money.ts and are
+ * meant to be tuned, and a hardcoded "8%" in the UI would quietly go stale.
+ */
+function cashOutFeePercent(wallet: Wallet): number {
+  const { topUpUsdCentsPerCoin: buy, payoutUsdCentsPerCoin: sell } = wallet.rates;
+  return Math.round(((buy - sell) / buy) * 100);
+}
 
 export default function Wallet() {
   const insets = useSafeAreaInsets();
@@ -78,7 +88,8 @@ export default function Wallet() {
       `Cash out ${formatCoins(data.balanceCoins)} coins?`,
       `You'll receive ${usd} in your bank account. Coins cash out at ${formatUsd(
         data.rates.payoutUsdCentsPerCoin,
-      )} each — that spread is how the app makes money instead of charging sellers a fee.`,
+      )} each, so converting to dollars costs you ${cashOutFeePercent(data)}%. Spending them ` +
+        `here costs nothing — that's the whole difference.`,
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -170,8 +181,8 @@ export default function Wallet() {
           })}
         </View>
         <Txt variant="caption" color={colors.inkMuted}>
-          Bigger packs come with bonus coins. Paid by card — Apple's in-app purchases
-          aren't allowed for real-world goods.
+          $1 buys one coin. Paid by card — Apple's in-app purchases aren't allowed for
+          things you collect in the real world.
         </Txt>
       </View>
 
@@ -260,9 +271,10 @@ export default function Wallet() {
       </View>
 
       <Txt variant="caption" color={colors.inkMuted}>
-        1 coin costs {formatUsd(data.rates.topUpUsdCentsPerCoin)} and cashes out at{" "}
-        {formatUsd(data.rates.payoutUsdCentsPerCoin)}. Coins you spend inside the app keep
-        their full value — only cashing out costs you the spread.
+        A coin costs {formatUsd(data.rates.topUpUsdCentsPerCoin)} and cashes out at{" "}
+        {formatUsd(data.rates.payoutUsdCentsPerCoin)} — so taking money out costs{" "}
+        {cashOutFeePercent(data)}%, and there is no fee on a sale. Coins you spend here keep
+        their full value.
       </Txt>
 
       <View style={{ height: space.xxl }} />

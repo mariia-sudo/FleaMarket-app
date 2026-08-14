@@ -23,6 +23,8 @@ export default function You() {
     [user?.id],
   );
   const saved = useQuery(() => api.favorites(), []);
+  // The payout rate is a tunable number on the server; never hardcode it here.
+  const rates = useQuery(() => api.wallet(), []);
 
   if (!user) return null;
 
@@ -122,7 +124,7 @@ export default function You() {
           title={tab === "listings" ? "Nothing listed yet" : "Nothing saved yet"}
           body={
             tab === "listings"
-              ? "Post something you're not using. Sellers keep 100% of the coins."
+              ? "Post something you're not using. There's no fee on the sale itself."
               : "Tap the heart on anything in the feed to keep it here."
           }
           action={
@@ -168,7 +170,10 @@ export default function You() {
       />
 
       <Txt variant="caption" color={colors.inkMuted} center>
-        Coins cash out at {formatUsd(85)} each · {user.email}
+        {rates.data
+          ? `Coins cash out at ${formatUsd(rates.data.rates.payoutUsdCentsPerCoin)} each · `
+          : ""}
+        {user.email}
       </Txt>
 
       <View style={{ height: space.xxl }} />

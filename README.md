@@ -153,17 +153,38 @@ to "why not just use Venmo": on Craigslist, whoever moves first is exposed.
 
 Set in `server/src/money.ts`. All of it is a lever.
 
-- **Buy coins:** $1.00 per coin, with bonus coins on bigger packs (up to +8%).
-- **Sell:** the seller keeps 100%. `PLATFORM_FEE_BPS = 0`.
-- **Cash out:** 1 coin pays $0.85.
+- **Buy coins:** $1.00 per coin, no bonuses.
+- **Sell:** no fee on the sale. `PLATFORM_FEE_BPS = 0`.
+- **Cash out:** 1 coin pays $0.92 — so converting to dollars costs the seller 8%,
+  and spending the coins here costs nothing.
 
-The platform earns on the spread, not on the sale. Someone who puts in $100 gets 108
-coins; if every coin is eventually cashed out we pay $91.80 and keep $8.20 gross (~8%),
-of which Stripe takes roughly half. Coins that keep circulating inside the market never
-cost us the spread at all — which is why "spend what you earned here" is worth pushing
-in the UI.
+**Do not call this "0% seller fees."** A seller who cashes out pays 8%, and anyone who
+does the arithmetic will spot the spin. The honest line — "you only pay when you take
+money out" — is also the one that makes the incentive to keep coins circulating obvious.
 
-"0% seller fees" is also the marketing. Mercari takes ~10%, Poshmark 20%.
+On $100 topped up and later fully cashed out: $100 in, less Stripe's 2.9% + $0.30, is
+$96.80; $92.00 out plus ~$0.25 payout cost is $92.25; we keep about **$4.55, ~4.5%**.
+Thin enough that bonus coins had to go — every bonus coin comes out of that number.
+
+#### Why 8%, checked against the market (August 2026)
+
+| Platform | Seller fee |
+|---|---|
+| Poshmark | 20% (or $2.95 under $15) |
+| eBay | ~13.25-13.6% + $0.30-0.40 |
+| OfferUp (shipped) | 12.9% |
+| Mercari | 10% |
+| Facebook Marketplace (shipped) | 10%, min $0.80 |
+| Etsy | 6.5% + $0.20 |
+| Depop | 0% + 3.3% + $0.45 processing |
+| **Facebook Marketplace (local pickup)** | **0%** |
+| **OfferUp (local)** | **0%** |
+| **Craigslist** | free |
+
+The split that matters: marketplaces that *ship* take a real cut, and 8% undercuts all
+of them except Depop. Marketplaces for *local pickup* - which is what this app is - are
+free, because they don't touch the payment at all. They also don't hold the money until
+the buyer has the item, and that, not price, is what this product sells.
 
 ### Audit
 

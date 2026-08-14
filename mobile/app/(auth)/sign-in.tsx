@@ -46,7 +46,8 @@ export default function SignIn() {
         <View style={{ gap: space.sm }}>
           <Txt variant="display">Everything nearby,{"\n"}second hand.</Txt>
           <Txt variant="body" color={colors.inkSoft}>
-            Buy and sell with coins. Escrow on every deal, no fees for sellers.
+            Buy and sell with coins. Every deal is held until you have the item in
+            your hands.
           </Txt>
         </View>
 

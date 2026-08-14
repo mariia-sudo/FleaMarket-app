@@ -193,7 +193,8 @@ export default function ListingDetail() {
           <View style={styles.escrowNote}>
             <Ionicons name="lock-closed" size={16} color={colors.positive} />
             <Txt variant="caption" color={colors.inkSoft} style={{ flex: 1 } as object}>
-              Coins are held until you confirm pickup. The seller keeps 100% — no selling fees.
+              Coins are held until you confirm pickup. Cancel any time before that
+              and they come straight back.
             </Txt>
           </View>
         </View>
