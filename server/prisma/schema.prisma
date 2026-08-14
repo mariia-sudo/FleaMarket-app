@@ -1,0 +1,277 @@
+// FleaMarket — schema
+//
+// MONEY UNITS — read this before touching any amount field.
+//   * Every `*Coins` field is an INTEGER in MINOR coin units. 1 coin = 100 minor units.
+//     A listing priced at "25.00 coins" is stored as 2500.
+//   * Every `*UsdCents` field is an INTEGER in USD cents, exactly like Stripe's `amount`.
+//   * Never store money as Float. Conversion lives in src/money.ts and nowhere else.
+//
+// Enum-ish columns are plain String because SQLite has no native enums. The allowed
+// values are declared as TypeScript unions in src/types.ts — keep the two in sync.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  // SQLite for local development. Swap to postgresql for production — the schema is
+  // written to be portable (no SQLite-only types are used).
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// People
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  displayName  String
+  avatarUrl    String?
+  bio          String?
+
+  // Rough location only. We never store a street address — buyers and sellers
+  // agree on a meeting spot in chat, like every other local marketplace.
+  city  String?
+  state String?
+  zip   String?
+
+  // Stripe Connect express account, created lazily the first time a user asks
+  // to cash out. Until `payoutsEnabled` is true, Stripe has not finished KYC
+  // and transfers will be rejected.
+  stripeAccountId String? @unique
+  payoutsEnabled  Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  accounts       Account[]
+  listings       Listing[]
+  purchases      Order[]    @relation("BuyerOrders")
+  sales          Order[]    @relation("SellerOrders")
+  topUps         TopUp[]
+  payouts        Payout[]
+  favorites      Favorite[]
+  sentMessages   Message[]
+  threadsAsBuyer Thread[]   @relation("ThreadBuyer")
+}
+
+// ---------------------------------------------------------------------------
+// Listings
+// ---------------------------------------------------------------------------
+
+model Listing {
+  id       String @id @default(cuid())
+  sellerId String
+  seller   User   @relation(fields: [sellerId], references: [id])
+
+  title       String
+  description String
+  priceCoins  Int // minor coin units
+
+  category  String // see CATEGORIES in src/types.ts
+  condition String // NEW | LIKE_NEW | GOOD | FAIR
+  status    String @default("ACTIVE") // ACTIVE | RESERVED | SOLD | REMOVED
+
+  city  String?
+  state String?
+  zip   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  photos    ListingPhoto[]
+  orders    Order[]
+  favorites Favorite[]
+  threads   Thread[]
+
+  @@index([status, createdAt])
+  @@index([category, status])
+  @@index([sellerId])
+}
+
+model ListingPhoto {
+  id        String  @id @default(cuid())
+  listingId String
+  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  url       String
+  position  Int     @default(0)
+
+  @@index([listingId, position])
+}
+
+model Favorite {
+  userId    String
+  listingId String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, listingId])
+}
+
+// ---------------------------------------------------------------------------
+// Ledger — double-entry bookkeeping for coins
+// ---------------------------------------------------------------------------
+//
+// Every movement of coins is a LedgerTx holding two or more LedgerEntry rows
+// whose `delta` values sum to exactly zero. A user's balance is never stored as
+// a mutable column; it is the sum of that account's entries. This is the only
+// way to keep an audit trail that survives bugs, refunds and disputes.
+//
+// System accounts (userId = null) are allowed to go negative — SYSTEM_MINT
+// running to -50000 simply means 500 coins are in circulation.
+
+model Account {
+  id     String  @id @default(cuid())
+  // USER_AVAILABLE — spendable balance
+  // SYSTEM_MINT    — coins issued into existence (mirror of circulation)
+  // SYSTEM_ESCROW  — coins held during an open order
+  // SYSTEM_FEE     — platform revenue
+  // SYSTEM_PAYOUT  — coins burned when cashed out to USD
+  kind   String
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  entries LedgerEntry[]
+
+  // One account per (kind, user). System accounts have userId = null, and SQLite
+  // treats NULLs as distinct, so system accounts are additionally guarded by a
+  // unique `kind` lookup in code (see ledger.ts#systemAccount).
+  @@unique([kind, userId])
+  @@index([userId])
+}
+
+model LedgerTx {
+  id   String @id @default(cuid())
+  // TOPUP | PURCHASE | RELEASE | REFUND | PAYOUT | BONUS
+  kind String
+  // Free-form pointer back to the domain object that caused this movement,
+  // e.g. "order:clx123". Lets us reconstruct history without joins.
+  reference String?
+  memo      String?
+  createdAt DateTime @default(now())
+
+  entries LedgerEntry[]
+
+  @@index([kind, createdAt])
+  @@index([reference])
+}
+
+model LedgerEntry {
+  id        String   @id @default(cuid())
+  txId      String
+  tx        LedgerTx @relation(fields: [txId], references: [id], onDelete: Cascade)
+  accountId String
+  account   Account  @relation(fields: [accountId], references: [id])
+
+  // Signed amount in minor coin units. Positive = credit into this account.
+  delta     Int
+  createdAt DateTime @default(now())
+
+  @@index([accountId, createdAt])
+  @@index([txId])
+}
+
+// ---------------------------------------------------------------------------
+// Orders
+// ---------------------------------------------------------------------------
+
+model Order {
+  id        String  @id @default(cuid())
+  listingId String
+  listing   Listing @relation(fields: [listingId], references: [id])
+  buyerId   String
+  buyer     User    @relation("BuyerOrders", fields: [buyerId], references: [id])
+  sellerId  String
+  seller    User    @relation("SellerOrders", fields: [sellerId], references: [id])
+
+  amountCoins Int // what the buyer paid, minor units
+  feeCoins    Int // platform cut, minor units — seller receives amount - fee
+
+  // ESCROW    — buyer paid, coins parked in SYSTEM_ESCROW
+  // COMPLETED — buyer confirmed pickup, coins released to seller
+  // CANCELLED — released back to buyer before completion
+  status String @default("ESCROW")
+
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  @@index([buyerId, createdAt])
+  @@index([sellerId, createdAt])
+  @@index([listingId])
+}
+
+// ---------------------------------------------------------------------------
+// Real money in and out
+// ---------------------------------------------------------------------------
+
+model TopUp {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  usdCents   Int // what we charge the card
+  coins      Int // base coins bought, minor units
+  bonusCoins Int // promo coins on top, minor units
+
+  stripeSessionId String? @unique
+  // PENDING | COMPLETED | FAILED
+  status    String   @default("PENDING")
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model Payout {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  coins    Int // coins burned, minor units
+  usdCents Int // what lands on the seller's bank account
+
+  stripeTransferId String?
+  // PENDING | PAID | FAILED
+  status    String   @default("PENDING")
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Chat — buyers and sellers arrange the handoff themselves
+// ---------------------------------------------------------------------------
+
+model Thread {
+  id        String  @id @default(cuid())
+  listingId String
+  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  buyerId   String
+  buyer     User    @relation("ThreadBuyer", fields: [buyerId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime @default(now())
+  lastMessageAt DateTime @default(now())
+
+  messages Message[]
+
+  // One conversation per (listing, interested buyer).
+  @@unique([listingId, buyerId])
+  @@index([lastMessageAt])
+}
+
+model Message {
+  id       String @id @default(cuid())
+  threadId String
+  thread   Thread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  senderId String
+  sender   User   @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  body      String
+  createdAt DateTime @default(now())
+
+  @@index([threadId, createdAt])
+}

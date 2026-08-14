@@ -1,0 +1,22 @@
+node_modules/
+.DS_Store
+
+# Secrets. .env.example is checked in; .env is not.
+.env
+.env.local
+
+# SQLite development database
+server/prisma/*.db
+server/prisma/*.db-journal
+
+# Locally stored listing photos
+server/uploads/
+
+server/dist/
+
+# Expo
+mobile/.expo/
+mobile/ios/
+mobile/android/
+mobile/expo-env.d.ts
+*.log

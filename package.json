@@ -1,0 +1,14 @@
+{
+  "name": "fleamarket",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local second-hand marketplace priced in an in-app currency",
+  "scripts": {
+    "setup": "npm --prefix server install && npm --prefix server run reset && npm --prefix mobile install",
+    "api": "npm --prefix server run dev",
+    "app": "npm --prefix mobile run ios",
+    "audit": "npm --prefix server run audit",
+    "seed": "npm --prefix server run reset",
+    "typecheck": "npm --prefix server run typecheck && npm --prefix mobile run typecheck"
+  }
+}
